@@ -30,10 +30,12 @@ class StockPriceLSTM(nn.Module):
         return out
 
 
+# use just Adj Close prices for now, but later we may add some other features to allow for better prediction.
+num_features = 1
 # Model parameters
 input_size = num_features  # Number of input features
-hidden_size = 50  # Number of LSTM units
-num_layers = 2  # Number of LSTM layers
+hidden_size = 50  # Number of LSTM units to run in parallel
+num_layers = 2  # Number of LSTM layers to stack up
 output_size = 1  # Output size (1 for regression)
 
 # Initialize the model
