@@ -5,7 +5,7 @@ import time
 import os
 
 class ModelTrainer():
-    def __init__(self, model, loss_func, optimizer, train_samples, train_labels, params_dir, batch_size=32, lr=0.001, num_epochs=30):
+    def __init__(self, model, loss_func, optimizer, train_samples, train_labels, params_dir, batch_size=32, lr=0.001, num_epochs=30, bc_mod=25):
         self.model = model
         self.loss_func = loss_func
         self.optimizer = optimizer
@@ -16,17 +16,30 @@ class ModelTrainer():
         self.lr = lr
         self.num_epochs = num_epochs
 
-        self.val_size = 2000
-        self.train_size = len(train_samples) - self.val_size
+        # the batch count modulo. determines how often the model parameters are saved within a training epoch
+        # if bc_mod = 8, params will be saved once every 8 batches
+        self.bc_mod = bc_mod
 
-        train_data, val_data = random_split(train_samples, [self.train_size, self.val_size])
+        self.gen = torch.Generator().manual_seed(1234)
 
-        # load the train and validation into batches.
-        self.train_dl = DataLoader(train_data, batch_size, shuffle=True)
+        # split data into training, validation, test; as 80%, 10%, 10% respectively
+        # @ToDo: if there is a separate dataset for test, this data split will not be suitable.
+        self.train_size = int(0.8 * len(train_samples))
+        self.val_size = int(0.1 * len(train_samples))
+        self.test_size = len(train_samples) - self.train_size - self.val_size
+
+        train_data, val_data, test_data = random_split(
+            train_samples, [self.train_size, self.val_size, self.test_size], generator=self.gen
+        )
+
+        # load the train, validation, and test data into batches. use double the batch size for val and test since they
+        # will not need to store gradients.
+        self.train_dl = DataLoader(train_data, batch_size)
         self.val_dl = DataLoader(val_data, batch_size * 2)
+        self.test_dl = DataLoader(test_data, batch_size * 2)
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.model.to(self.self.device)
+        self.model.to(self.device)
     
     def saveModel(self):
         # concatenate name of the params directory with the current timestamp to obtain the file path.
@@ -69,8 +82,8 @@ class ModelTrainer():
 
             print("loss: " + str(loss.item()))
 
-            # save self.model once every 100 batches
-            if bc % 10 == 1:  # print every once in a while
+            # save model once every 200 samples (num_samples = bc * batch_size)
+            if bc % self.bc_mod == 1:
                 self.saveModel()
 
             bc += 1
@@ -93,29 +106,34 @@ class ModelTrainer():
 
         print('Training complete.')
 
-    # Define the validation function
-    def validate(self):
+    # use data='test' to use test data, use data='val'= to use validation data.
+    def test(self, data='test'):
         self.model.eval()
-        val_loss = 0.0
+        loss = 0.0
         correct = 0
         total = 0
 
+        dl = self.test_dl if data == 'test' else self.val_dl
+
         with torch.no_grad():
-            for inputs, labels in self.val_dl:
+            for inputs, labels in dl:
                 inputs, labels = inputs.to(self.device), labels.to(self.device)
 
                 outputs = self.model(inputs)
                 loss = self.loss_func(outputs, labels)
 
-                val_loss += loss.item() * inputs.size(0)
+                loss += loss.item() * inputs.size(0)
                 _, predicted = torch.max(outputs, 1)
                 total += labels.size(0)
                 correct += (predicted == labels).sum().item()
 
-        val_loss /= len(self.val_dl.dataset)
-        val_accuracy = 100 * correct / total
+        loss /= len(dl.dataset)
+        accuracy = 100 * correct / total
 
-        return val_loss, val_accuracy
+        return loss, accuracy
+
+    def validate(self):
+        return self.test(data='val')
     
     def run(self):
         # we will try loading self.model parameters. if an error occurs we will generate new self.model parameters.
