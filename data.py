@@ -6,6 +6,9 @@ from torch.utils.data import TensorDataset
 
 class DatasetManager():
     def __init__(self, dataset_path, scaler):
+        if not isinstance(dataset_path, str) or not dataset_path.endswith('.csv'):
+            raise Exception('self.dataset_path must be a string representing a filepath with .csv extension')
+
         self.dataset_path = dataset_path
         self.scaler = scaler
 
@@ -19,30 +22,29 @@ class DatasetManager():
         # save the data to a CSV file
         df = df[['Date', 'Adj Close']]
 
-        return df
-
-    def saveDatasetToFile(self, value):
-        torch.save(value, self.dataset_path)
-
-        return self
-
-    def loadDatasetFromFile(self):
-        try:
-            # there may be an exception
-            return torch.load(self.dataset_path)
-        except Exception as e:
-            print('Could not load dataset from the following path: ' + self.dataset_path)
-
-            raise e
-
-
-    def convertDataFrameToTensor(self, df, sequence_length):
         # Convert the Date column to datetime format (optional, but good practice)
         df['Date'] = pd.to_datetime(df['Date'])
 
         # Sort data by date in case it's not already sorted
         df.sort_values('Date', inplace=True)
 
+        return df
+
+    def saveDatasetToFile(self, df):
+        df.to_csv(self.dataset_path, index=False)
+
+        return self
+
+    def loadDatasetFromFile(self):
+        try:
+            # there may be an exception
+            return pd.read_csv(self.dataset_path)
+        except Exception as e:
+            print('Could not load dataset from the following path: ' + self.dataset_path)
+
+            raise e
+
+    def makeTensorDataset(self, df, sequence_length):
         # Normalize the 'Adj Close' prices
         df['Adj Close'] = self.scaler.fit_transform(df[['Adj Close']])
 

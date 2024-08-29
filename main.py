@@ -85,10 +85,6 @@ def plot_stock_chart(df):
 
 
 if __name__ == '__main__':
-    df = pd.read_csv('./resources/BRK_B_stock_price.csv')
-    plot_stock_chart(df)
-
-    exit()
     # # #display the first image in the dataset
     # # display_img(*train_dataset[0])
     # #
@@ -128,19 +124,15 @@ if __name__ == '__main__':
 
     scaler = MinMaxScaler(feature_range=(0, 1))
 
-    dataset_path = './resources/BRK_B_stock_price.pt'
+    dataset_path = './resources/BRK_B_stock_price.csv'
     params_dir = './params'
 
     dataMan = DatasetManager(dataset_path, scaler=scaler)
 
-    df = pd.read_csv('./resources/BRK_B_stock_price.csv')
-
-    dataMan.saveDatasetToFile(
-        dataMan.convertDataFrameToTensor(df, sequence_length)
-    )
+    df = dataMan.loadDatasetFromFile()
 
     #  @ToDo: potential exception here
-    train_samples = dataMan.loadDatasetFromFile()
+    train_samples = dataMan.makeTensorDataset(df, sequence_length)
     #  since it is an RNN model (i.e.: each output is also an output), training labels are among train_samples
     train_labels = None
 
