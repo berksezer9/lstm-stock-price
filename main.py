@@ -1,29 +1,48 @@
 import torch
 import torch.nn as nn
+
 class StockPriceLSTM(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, output_size):
         super(StockPriceLSTM, self).__init__()
+
         self.hidden_size = hidden_size
         self.num_layers = num_layers
 
-        # LSTM layers
-        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
+        # Create a list to hold LSTM layers and LayerNorm layers
+        self.lstm_layers = nn.ModuleList()
+
+        # For each LSTM layer
+        for _ in range(self.num_layers):
+            # Add an LSTM layer
+            self.lstm_layers.append(nn.LSTM(input_size, hidden_size, batch_first=True))
+            # Add a LayerNorm layer
+            self.lstm_layers.append(nn.LayerNorm(hidden_size))
+            # After the first LSTM layer, input size becomes hidden size
+            input_size = hidden_size
 
         # Fully connected layers
-        self.fc1 = nn.Linear(hidden_size, 25)  # First Dense layer with 25 units
-        self.relu = nn.ReLU()  # ReLU activation
-        self.fc2 = nn.Linear(25, output_size)  # Output layer with 1 unit for regression
+        self.fc1 = nn.Linear(hidden_size, 25)
+        self.relu = nn.ReLU()
+        self.fc2 = nn.Linear(25, output_size)
 
     def forward(self, x):
-        # Initialize hidden and cell states for LSTM
-        h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
-        c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
+        # Initialize hidden and cell states
+        h, c = [], []
+        for _ in range(self.num_layers):
+            h.append(torch.zeros(1, x.size(0), self.hidden_size).to(x.device))
+            c.append(torch.zeros(1, x.size(0), self.hidden_size).to(x.device))
 
-        # Forward propagate LSTM
-        out, _ = self.lstm(x, (h0, c0))
+        out = x
+
+        # Manually loop through LSTM and LayerNorm layers
+        for i in range(self.num_layers):
+            # LSTM layer forward pass
+            out, (h[i], c[i]) = self.lstm_layers[2 * i](out, (h[i], c[i]))
+            # LayerNorm layer forward pass
+            out = self.lstm_layers[2 * i + 1](out)
 
         # Pass the output through the fully connected layers
-        out = self.fc1(out[:, -1, :])  # Taking the last time step's output
+        out = self.fc1(out[:, -1, :])  # Take the output of the last time step
         out = self.relu(out)
         out = self.fc2(out)
 
