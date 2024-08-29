@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from train import ModelTrainer
 
 class StockPriceLSTM(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, output_size):
@@ -48,20 +49,49 @@ class StockPriceLSTM(nn.Module):
 
         return out
 
+if __name__ == '__main__':
+    # # #display the first image in the dataset
+    # # display_img(*train_dataset[0])
+    # #
+    # # #display the first batch
+    # # show_batch(train_dl)
+    #
+    # # print the lengths
+    # print(f"Length of Train Data : {len(train_data)}")
+    # print(f"Length of Validation Data : {len(val_data)}")
+    #
+    # # output
+    # # Length of Train Data : 12034
+    # # Length of Validation Data : 2000
 
-# use just Adj Close prices for now, but later we may add some other features to allow for better prediction.
-num_features = 1
-# Model parameters
-input_size = num_features  # Number of input features
-hidden_size = 50  # Number of LSTM units to run in parallel
-num_layers = 2  # Number of LSTM layers to stack up
-output_size = 1  # Output size (1 for regression)
+    # use just Adj Close prices for now, but later we may add some other features to allow for better prediction.
+    num_features = 1
+    # Model parameters
+    input_size = num_features  # Number of input features
+    hidden_size = 50  # Number of LSTM units to run in parallel
+    num_layers = 2  # Number of LSTM layers to stack up
+    output_size = 1  # Output size (1 for regression)
 
-# Initialize the model
-model = StockPriceLSTM(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers, output_size=output_size)
+    # Initialize the model
+    model = StockPriceLSTM(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers,
+                           output_size=output_size)
 
-# Loss and optimizer
-criterion = nn.MSELoss()
-optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    # Loss and optimizer
+    loss_func = nn.MSELoss()
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
-print(model)
+    train_samples = None
+    train_labels = None
+
+    params_dir = './params'
+
+    # hyper-parameters
+    batch_size = 32
+    lr = 0.001
+    num_epochs = 30
+    bc_mod = 25
+
+    mt = ModelTrainer(
+        model=model, loss_func=loss_func, optimizer=optimizer, train_samples=train_samples, train_labels=train_labels,
+        params_dir=params_dir, batch_size=batch_size, lr=lr, num_epochs=num_epochs, bc_mod=bc_mod
+    )
