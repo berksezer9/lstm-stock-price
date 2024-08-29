@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 from train import ModelTrainer
+from data import DatasetManager
+import pandas as pd
 
 class StockPriceLSTM(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, output_size):
@@ -80,18 +82,39 @@ if __name__ == '__main__':
     loss_func = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
-    train_samples = None
-    train_labels = None
-
-    params_dir = './params'
-
     # hyper-parameters
     batch_size = 32
     lr = 0.001
     num_epochs = 30
-    bc_mod = 25
+    bc_mod = None
+    sequence_length = 50
+
+    dataset_path = './resources/BRK_B_stock_price.pt'
+    params_dir = './params'
+
+    dataMan = DatasetManager(dataset_path)
+
+    df = pd.read_csv('./resources/BRK_B_stock_price.csv')
+
+    dataMan.saveDatasetToFile(
+        dataMan.convertDataFrameToTensor(df, sequence_length)
+    )
+
+    #  @ToDo: potential exception here
+    train_samples = dataMan.loadDatasetFromFile()
+    #  since it is an RNN model (i.e.: each output is also an output), training labels are among train_samples
+    train_labels = None
+
+    def batch_inputs_callback(batch_inputs):
+        return batch_inputs.unsqueeze(-1)
+
+    def batch_labels_callback(batch_labels):
+        return batch_labels.unsqueeze(1)
 
     mt = ModelTrainer(
         model=model, loss_func=loss_func, optimizer=optimizer, train_samples=train_samples, train_labels=train_labels,
-        params_dir=params_dir, batch_size=batch_size, lr=lr, num_epochs=num_epochs, bc_mod=bc_mod
+        params_dir=params_dir, batch_size=batch_size, lr=lr, num_epochs=num_epochs, bc_mod=bc_mod,
+        batch_inputs_callback=batch_inputs_callback, batch_labels_callback=batch_labels_callback
     )
+
+    mt.train()

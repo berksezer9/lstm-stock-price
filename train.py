@@ -5,7 +5,7 @@ import time
 import os
 
 class ModelTrainer():
-    def __init__(self, model, loss_func, optimizer, train_samples, train_labels, params_dir, batch_size=32, lr=0.001, num_epochs=30, bc_mod=25):
+    def __init__(self, model, loss_func, optimizer, train_samples, train_labels, params_dir, batch_size=32, lr=0.001, num_epochs=30, bc_mod=None, batch_inputs_callback=None, batch_labels_callback=None):
         self.model = model
         self.loss_func = loss_func
         self.optimizer = optimizer
@@ -15,9 +15,12 @@ class ModelTrainer():
         self.batch_size = batch_size
         self.lr = lr
         self.num_epochs = num_epochs
+        self.batch_inputs_callback = batch_inputs_callback
+        self.batch_labels_callback = batch_labels_callback
 
         # the batch count modulo. determines how often the model parameters are saved within a training epoch
-        # if bc_mod = 8, params will be saved once every 8 batches
+        # if bc_mod = 8, params will be saved once every 8 batches.
+        # if it is set to none, we will save parameters only at the end of an epoch.
         self.bc_mod = bc_mod
 
         self.gen = torch.Generator().manual_seed(1234)
@@ -40,6 +43,8 @@ class ModelTrainer():
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model.to(self.device)
+
+        self.loadParams()
     
     def saveModel(self):
         # concatenate name of the params directory with the current timestamp to obtain the file path.
@@ -59,6 +64,12 @@ class ModelTrainer():
 
         # for each batch
         for inputs, labels in self.train_dl:
+            if self.batch_inputs_callback is not None:
+                inputs = self.batch_inputs_callback(inputs)
+                
+            if self.batch_labels_callback is not None:
+                labels = self.batch_labels_callback(labels)
+            
             inputs, labels = inputs.to(self.device), labels.to(self.device)
 
             # Zero the parameter gradients
@@ -83,10 +94,12 @@ class ModelTrainer():
             print("loss: " + str(loss.item()))
 
             # save model once every 200 samples (num_samples = bc * batch_size)
-            if bc % self.bc_mod == 1:
+            if self.bc_mod is not None and bc % self.bc_mod == 1:
                 self.saveModel()
 
             bc += 1
+
+        self.saveModel()
 
         epoch_loss = running_loss / len(self.train_dl.dataset)
         epoch_accuracy = 100 * correct / total
@@ -117,6 +130,12 @@ class ModelTrainer():
 
         with torch.no_grad():
             for inputs, labels in dl:
+                if self.batch_inputs_callback is not None:
+                    inputs = self.batch_inputs_callback(inputs)
+
+                if self.batch_labels_callback is not None:
+                    labels = self.batch_labels_callback(labels)
+
                 inputs, labels = inputs.to(self.device), labels.to(self.device)
 
                 outputs = self.model(inputs)
@@ -135,7 +154,7 @@ class ModelTrainer():
     def validate(self):
         return self.test(data='val')
     
-    def run(self):
+    def loadParams(self):
         # we will try loading self.model parameters. if an error occurs we will generate new self.model parameters.
         try:
             files = os.listdir(self.params_dir)
@@ -153,4 +172,5 @@ class ModelTrainer():
 
             print("Parameters loaded successfully.")
         except Exception:
-            print("Failed to load parameters. Make sure you have the './params' dir")
+            print("Failed to load parameters. If you have not saved any parameters yet, this is fine."
+                  " Just make sure you have a directory named: " + self.params_dir)

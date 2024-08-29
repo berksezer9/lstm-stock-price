@@ -1,3 +1,5 @@
 torch
 matplotlib
 yfinance
+pandas
+scikit-learn
