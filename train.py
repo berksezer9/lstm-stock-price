@@ -147,7 +147,7 @@ class ModelTrainer():
                 # Save predictions and actual values
 
                 # Get the predictions for the last timestep
-                predictions.append(outputs[:, -1].squeeze().cpu().numpy())
+                predictions.append(outputs.squeeze().cpu().numpy())
                 actuals.append(labels.cpu().numpy())
 
         test_loss /= len(dl.dataset)
@@ -191,11 +191,9 @@ class ModelTrainer():
                   " Just make sure you have a directory named: " + self.params_dir)
 
     def plotPredictions(self, predictions, actuals):
-        # Plotting
         plt.figure(figsize=(14, 7))
-        plt.plot(actuals, label='Actual Prices', color='b')
-        plt.plot(predictions, label='Predicted Prices', color='r')
-        plt.title('Stock Price Predictions vs Actual Prices')
+        plt.plot(actuals, label='Actual Prices', color='b', linestyle='--', alpha=0.6)
+        plt.plot(predictions, label='Predicted Prices', color='orange', linewidth=2)
         plt.xlabel('Time')
         plt.ylabel('Stock Price')
         plt.legend()

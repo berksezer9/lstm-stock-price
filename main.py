@@ -4,6 +4,7 @@ from train import ModelTrainer
 from data import DatasetManager
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
+import matplotlib.pyplot as plt
 
 class StockPriceLSTM(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, output_size):
@@ -52,7 +53,42 @@ class StockPriceLSTM(nn.Module):
 
         return out
 
+def plot_stock_chart(df):
+    """
+    Plot the adjusted close price of a stock from a DataFrame.
+
+    :param df: DataFrame containing 'Date' and 'Adj Close' columns.
+    """
+    # Ensure 'Date' column is in datetime format
+    df['Date'] = pd.to_datetime(df['Date'])
+
+    # Set 'Date' as the index
+    df.set_index('Date', inplace=True)
+
+    # Plot the adjusted close price
+    plt.figure(figsize=(12, 6))
+    plt.plot(df.index, df['Adj Close'], label='Adj Close', color='blue')
+
+    # Set the title and labels
+    plt.title('Adjusted Close Price of BRK.B')
+    plt.xlabel('Date')
+    plt.ylabel('Adjusted Close Price')
+
+    # Rotate and format the date labels on x-axis
+    plt.xticks(rotation=45)
+    plt.grid(True)
+    plt.legend()
+
+    # Display the plot
+    plt.tight_layout()
+    plt.show()
+
+
 if __name__ == '__main__':
+    df = pd.read_csv('./resources/BRK_B_stock_price.csv')
+    plot_stock_chart(df)
+
+    exit()
     # # #display the first image in the dataset
     # # display_img(*train_dataset[0])
     # #
