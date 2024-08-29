@@ -3,6 +3,7 @@ import torch.nn as nn
 from train import ModelTrainer
 from data import DatasetManager
 import pandas as pd
+from sklearn.preprocessing import MinMaxScaler
 
 class StockPriceLSTM(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, output_size):
@@ -89,10 +90,12 @@ if __name__ == '__main__':
     bc_mod = None
     sequence_length = 50
 
+    scaler = MinMaxScaler(feature_range=(0, 1))
+
     dataset_path = './resources/BRK_B_stock_price.pt'
     params_dir = './params'
 
-    dataMan = DatasetManager(dataset_path)
+    dataMan = DatasetManager(dataset_path, scaler=scaler)
 
     df = pd.read_csv('./resources/BRK_B_stock_price.csv')
 
@@ -113,7 +116,7 @@ if __name__ == '__main__':
 
     mt = ModelTrainer(
         model=model, loss_func=loss_func, optimizer=optimizer, train_samples=train_samples, train_labels=train_labels,
-        params_dir=params_dir, batch_size=batch_size, lr=lr, num_epochs=num_epochs, bc_mod=bc_mod,
+        params_dir=params_dir, price_scaler=scaler, batch_size=batch_size, lr=lr, num_epochs=num_epochs, bc_mod=bc_mod,
         batch_inputs_callback=batch_inputs_callback, batch_labels_callback=batch_labels_callback
     )
 

@@ -3,15 +3,20 @@ from torch.utils.data.dataloader import DataLoader
 from torch.utils.data import random_split
 import time
 import os
+import matplotlib.pyplot as plt
+import numpy as np
 
 class ModelTrainer():
-    def __init__(self, model, loss_func, optimizer, train_samples, train_labels, params_dir, batch_size=32, lr=0.001, num_epochs=30, bc_mod=None, batch_inputs_callback=None, batch_labels_callback=None):
+    def __init__(self, model, loss_func, optimizer, train_samples, train_labels, params_dir, price_scaler,
+                 batch_size=32, lr=0.001, num_epochs=30, bc_mod=None, batch_inputs_callback=None,
+                 batch_labels_callback=None):
         self.model = model
         self.loss_func = loss_func
         self.optimizer = optimizer
         self.train_samples = train_samples
         self.train_labels = train_labels
         self.params_dir = params_dir
+        self.price_scaler = price_scaler
         self.batch_size = batch_size
         self.lr = lr
         self.num_epochs = num_epochs
@@ -57,9 +62,7 @@ class ModelTrainer():
     # Define the training function
     def train_epoch(self):
         self.model.train()
-        running_loss = 0.0
-        correct = 0
-        total = 0
+        epoch_loss = 0.0
         bc = 1
 
         # for each batch
@@ -83,15 +86,12 @@ class ModelTrainer():
             loss.backward()
             self.optimizer.step()
 
-            # Accumulate loss and accuracy
-            running_loss += loss.item() * inputs.size(0)
-            _, predicted = torch.max(outputs, 1)
-            total += labels.size(0)
-            correct += (predicted == labels).sum().item()
-
             print("batch count: " + str(bc))
 
             print("loss: " + str(loss.item()))
+
+            # Accumulate loss
+            epoch_loss += loss.item() * inputs.size(0)
 
             # save model once every 200 samples (num_samples = bc * batch_size)
             if self.bc_mod is not None and bc % self.bc_mod == 1:
@@ -101,32 +101,33 @@ class ModelTrainer():
 
         self.saveModel()
 
-        epoch_loss = running_loss / len(self.train_dl.dataset)
-        epoch_accuracy = 100 * correct / total
+        epoch_loss /= len(self.train_dl.dataset)
 
-        return epoch_loss, epoch_accuracy
+        return epoch_loss
 
 
     def train(self):
         for epoch in range(self.num_epochs):
             # Train the self.model
-            train_loss, train_accuracy = self.train_epoch()
-            print(f'Epoch [{epoch + 1}/{self.num_epochs}], Train Loss: {train_loss:.4f}, Train Accuracy: {train_accuracy:.2f}%')
+            train_loss = self.train_epoch()
+            print(f'Epoch [{epoch + 1}/{self.num_epochs}], Avg. Train Loss: {train_loss:.4f}')
 
             # Validate the self.model
-            val_loss, val_accuracy = self.validate()
-            print(f'Validation Loss: {val_loss:.4f}, Validation Accuracy: {val_accuracy:.2f}%')
+            val = self.validate()
+            print(f'Avg. Validation Loss: {val["loss"]:.4f}')
+
+            # plot
+            self.plotPredictions(val['predictions'], val['actuals'])
 
         print('Training complete.')
 
     # use data='test' to use test data, use data='val'= to use validation data.
     def test(self, data='test'):
         self.model.eval()
-        loss = 0.0
-        correct = 0
-        total = 0
-
+        test_loss = 0.0
         dl = self.test_dl if data == 'test' else self.val_dl
+        predictions = []
+        actuals = []
 
         with torch.no_grad():
             for inputs, labels in dl:
@@ -139,17 +140,31 @@ class ModelTrainer():
                 inputs, labels = inputs.to(self.device), labels.to(self.device)
 
                 outputs = self.model(inputs)
-                loss = self.loss_func(outputs, labels)
+                batch_loss = self.loss_func(outputs, labels)
 
-                loss += loss.item() * inputs.size(0)
-                _, predicted = torch.max(outputs, 1)
-                total += labels.size(0)
-                correct += (predicted == labels).sum().item()
+                test_loss += batch_loss.item() * inputs.size(0)
 
-        loss /= len(dl.dataset)
-        accuracy = 100 * correct / total
+                # Save predictions and actual values
 
-        return loss, accuracy
+                # Get the predictions for the last timestep
+                predictions.append(outputs[:, -1].squeeze().cpu().numpy())
+                actuals.append(labels.cpu().numpy())
+
+        test_loss /= len(dl.dataset)
+
+        # Flatten lists to arrays
+        predictions = np.concatenate(predictions, axis=0)
+        actuals = np.concatenate(actuals, axis=0)
+
+        # Reverse the scaling (to get original price range)
+        predictions = self.price_scaler.inverse_transform(predictions.reshape(-1, 1)).flatten()
+        actuals = self.price_scaler.inverse_transform(actuals.reshape(-1, 1)).flatten()
+
+        return {
+            'loss': test_loss,
+            'predictions': predictions,
+            'actuals': actuals,
+        }
 
     def validate(self):
         return self.test(data='val')
@@ -174,3 +189,14 @@ class ModelTrainer():
         except Exception:
             print("Failed to load parameters. If you have not saved any parameters yet, this is fine."
                   " Just make sure you have a directory named: " + self.params_dir)
+
+    def plotPredictions(self, predictions, actuals):
+        # Plotting
+        plt.figure(figsize=(14, 7))
+        plt.plot(actuals, label='Actual Prices', color='b')
+        plt.plot(predictions, label='Predicted Prices', color='r')
+        plt.title('Stock Price Predictions vs Actual Prices')
+        plt.xlabel('Time')
+        plt.ylabel('Stock Price')
+        plt.legend()
+        plt.show()

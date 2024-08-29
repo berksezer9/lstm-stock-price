@@ -2,12 +2,12 @@ import numpy as np
 import yfinance as yf
 import pandas as pd
 import torch
-from sklearn.preprocessing import MinMaxScaler
 from torch.utils.data import TensorDataset
 
 class DatasetManager():
-    def __init__(self, dataset_path):
+    def __init__(self, dataset_path, scaler):
         self.dataset_path = dataset_path
+        self.scaler = scaler
 
     def downloadDataset(self):
         # Define the ticker symbol
@@ -44,8 +44,7 @@ class DatasetManager():
         df.sort_values('Date', inplace=True)
 
         # Normalize the 'Adj Close' prices
-        scaler = MinMaxScaler(feature_range=(0, 1))
-        df['Adj Close'] = scaler.fit_transform(df[['Adj Close']])
+        df['Adj Close'] = self.scaler.fit_transform(df[['Adj Close']])
 
         # Convert data to sequences of fixed length
         def create_sequences(data, seq_length):
