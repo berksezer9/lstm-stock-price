@@ -131,7 +131,6 @@ if __name__ == '__main__':
 
     df = dataMan.loadDatasetFromFile()
 
-    #  @ToDo: potential exception here
     train_samples = dataMan.makeTensorDataset(df, sequence_length)
     #  since it is an RNN model (i.e.: each output is also an output), training labels are among train_samples
     train_labels = None

@@ -1,6 +1,5 @@
 import torch
-from torch.utils.data.dataloader import DataLoader
-from torch.utils.data import random_split
+from torch.utils.data import DataLoader, Subset
 import time
 import os
 import matplotlib.pyplot as plt
@@ -28,23 +27,22 @@ class ModelTrainer():
         # if it is set to none, we will save parameters only at the end of an epoch.
         self.bc_mod = bc_mod
 
-        self.gen = torch.Generator().manual_seed(1234)
-
         # split data into training, validation, test; as 80%, 10%, 10% respectively
         # @ToDo: if there is a separate dataset for test, this data split will not be suitable.
         self.train_size = int(0.8 * len(train_samples))
         self.val_size = int(0.1 * len(train_samples))
         self.test_size = len(train_samples) - self.train_size - self.val_size
 
-        train_data, val_data, test_data = random_split(
-            train_samples, [self.train_size, self.val_size, self.test_size], generator=self.gen
-        )
+        # Define indices for splitting
+        train_indices = list(range(self.train_size))
+        val_indices = list(range(self.train_size, self.train_size + self.val_size))
+        test_indices = list(range(self.train_size + self.val_size, len(train_samples)))
 
         # load the train, validation, and test data into batches. use double the batch size for val and test since they
         # will not need to store gradients.
-        self.train_dl = DataLoader(train_data, batch_size)
-        self.val_dl = DataLoader(val_data, batch_size * 2)
-        self.test_dl = DataLoader(test_data, batch_size * 2)
+        self.train_dl = DataLoader(Subset(train_samples, train_indices), batch_size, shuffle=True)
+        self.val_dl = DataLoader(Subset(train_samples, val_indices), batch_size * 2, shuffle=False)
+        self.test_dl = DataLoader(Subset(train_samples, test_indices), batch_size * 2, shuffle=False)
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model.to(self.device)
