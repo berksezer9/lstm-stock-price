@@ -1,4 +1,5 @@
 .env
 resources/*
 params/*
+params_highlight/*
 .idea/*

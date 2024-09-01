@@ -111,16 +111,13 @@ class ModelTrainer():
             print(f'Epoch [{epoch + 1}/{self.num_epochs}], Avg. Train Loss: {train_loss:.4f}')
 
             # Validate the self.model
-            val = self.validate()
+            val = self.validate(plot=True)
             print(f'Avg. Validation Loss: {val["loss"]:.4f}')
-
-            # plot
-            self.plotPredictions(val['predictions'], val['actuals'])
 
         print('Training complete.')
 
     # use data='test' to use test data, use data='val'= to use validation data.
-    def test(self, data='test'):
+    def test(self, data='test', plot=True):
         self.model.eval()
         test_loss = 0.0
         dl = self.test_dl if data == 'test' else self.val_dl
@@ -158,14 +155,20 @@ class ModelTrainer():
         predictions = self.price_scaler.inverse_transform(predictions.reshape(-1, 1)).flatten()
         actuals = self.price_scaler.inverse_transform(actuals.reshape(-1, 1)).flatten()
 
-        return {
+        val = {
             'loss': test_loss,
             'predictions': predictions,
             'actuals': actuals,
         }
 
-    def validate(self):
-        return self.test(data='val')
+        if plot:
+            # plot
+            self.plotPredictions(val['predictions'], val['actuals'])
+
+        return val
+
+    def validate(self, plot=True):
+        return self.test(data='val', plot=plot)
     
     def loadParams(self):
         # we will try loading self.model parameters. if an error occurs we will generate new self.model parameters.
