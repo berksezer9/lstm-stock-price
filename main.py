@@ -104,7 +104,7 @@ if __name__ == '__main__':
     # Model parameters
     input_size = num_features  # Number of input features
     hidden_size = 50  # Number of LSTM units to run in parallel
-    num_layers = 2  # Number of LSTM layers to stack up
+    num_layers = 1  # Number of LSTM layers to stack up
     output_size = 1  # Output size (1 for regression)
 
     # Initialize the model
